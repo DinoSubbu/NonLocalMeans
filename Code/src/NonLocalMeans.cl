@@ -3,7 +3,7 @@
 #endif
 
 //TODO
-__kernel void sobelKernel1(/*...*/) {
+__kernel void nonLocalMeans(/*...*/) {
 }
 
 //TODO
