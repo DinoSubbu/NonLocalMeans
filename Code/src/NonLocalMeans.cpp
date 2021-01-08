@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 	cl::CommandQueue queue(context, device, CL_QUEUE_PROFILING_ENABLE);
 
 	// Load the source code
-	cl::Program program = OpenCL::loadProgramSource(context, "src/OpenCLExercise3_Sobel.cl");
+	cl::Program program = OpenCL::loadProgramSource(context, "src/NonLocalMeans.cl");
 	// Compile the source code. This is similar to program.build(devices) but will print more detailed error messages
 	OpenCL::buildProgram(program, devices);
 
@@ -103,12 +103,25 @@ int main(int argc, char** argv) {
 
 	// Allocate space for input and output data on the device
 	//TODO
+	//cl::Image2D d_input(context, CL_MEM_READ_ONLY,cl::ImageFormat(CL_R,CL_FLOAT),countX,countY);
+	cl::Buffer d_input(context, CL_MEM_READ_WRITE,size);
+	cl::Buffer d_output(context, CL_MEM_READ_WRITE,size);
+	cl::size_t<3> origin;
+	origin[0] = origin[1] = origin[2] = 0;
+
+	cl::size_t<3> region;
+	region[0] = countX;
+	region[1] = countY;
+	region[2] = 1;
 
 	// Initialize memory to 0xff (useful for debugging because otherwise GPU memory will contain information from last execution)
 	memset(h_input.data(), 255, size);
 	memset(h_outputCpu.data(), 255, size);
 	memset(h_outputGpu.data(), 255, size);
 	//TODO: GPU
+	//queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
+	queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
+	queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
 
 	//////// Load input data ////////////////////////////////
 	// Use random input data
@@ -117,9 +130,10 @@ int main(int argc, char** argv) {
 		h_input[i] = (rand() % 100) / 5.0f - 10.0f;
 	*/
 	// Use an image (Valve.pgm) as input data
+	std::size_t inputWidth, inputHeight;
 	{
 		std::vector<float> inputData;
-		std::size_t inputWidth, inputHeight;
+		
 		Core::readImagePGM("Valve.pgm", inputData, inputWidth, inputHeight);
 		for (size_t j = 0; j < countY; j++) {
 			for (size_t i = 0; i < countX; i++) {
@@ -128,39 +142,60 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	// Copy input data to device
+	//TODO
+	queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
+
 	// Do calculation on the host side
-	sobelHost(h_input, h_outputCpu, countX, countY);
+	//sobelHost(h_input, h_outputCpu, countX, countY);
 
 	//////// Store CPU output image ///////////////////////////////////
-	Core::writeImagePGM("output_sobel_cpu.pgm", h_outputCpu, countX, countY);
+	//Core::writeImagePGM("output_sobel_cpu.pgm", h_outputCpu, countX, countY);
+
+	// Reinitialize output memory to 0xff
+	memset(h_outputGpu.data(), 255, size);
+	//TODO: GPU
+	queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
 
 	std::cout << std::endl;
 	// Iterate over all implementations (task 1 - 3)
-	for (int impl = 1; impl <= 1; impl++) {
-		std::cout << "Implementation #" << impl << ":" << std::endl;
-
-		// Reinitialize output memory to 0xff
-		memset(h_outputGpu.data(), 255, size);
-		//TODO: GPU
-
+	for (int iteration = 0; iteration < 3; ++iteration) 
+	{
+		
 		// Copy input data to device
 		//TODO
+		//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
 
 		// Create a kernel object
-		std::string kernelName = "sobelKernel" + boost::lexical_cast<std::string> (impl);
-		cl::Kernel sobelKernel(program, kernelName.c_str ());
+		cl::Kernel kernelNonLocal(program, "nonLocalMeans");
 
 		// Launch kernel on the device
 		//TODO
+		kernelNonLocal.setArg(0, d_input);
+		kernelNonLocal.setArg(1, d_output);
+		// To decide and add other kernel args
 
+        queue.enqueueNDRangeKernel(
+            kernelNonLocal,
+            cl::NullRange,
+            cl::NDRange(inputWidth, inputHeight),
+            cl::NullRange
+        );
+
+		auto tmp = d_input;
+		d_input = d_output;
+		d_output = tmp;
+
+	}
 		// Copy output data back to host
 		//TODO
-
+		queue.enqueueReadBuffer(d_output, true, 0, size, h_outputGpu.data(), NULL, NULL);
+	
 		// Print performance data
 		//TODO
 
 		//////// Store GPU output image ///////////////////////////////////
-		Core::writeImagePGM("output_sobel_gpu_" + boost::lexical_cast<std::string> (impl) + ".pgm", h_outputGpu, countX, countY);
+		Core::writeImagePGM("output_nonlocal_gpu.pgm", h_outputGpu, countX, countY);
 
 		// Check whether results are correct
 		std::size_t errorCount = 0;
@@ -183,7 +218,7 @@ int main(int argc, char** argv) {
 		}
 
 		std::cout << std::endl;
-	}
+	
 
 	std::cout << "Success" << std::endl;
 
