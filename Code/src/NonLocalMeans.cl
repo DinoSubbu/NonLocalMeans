@@ -4,6 +4,19 @@
 
 __constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
 
+float calculateDiff(__read_only image2d_t imageInput, int2 pos1, int2 pos2, int filterSize, int iteration) {
+    float res = 0.0f;
+    for(int offset_x = -FILTER_SIZE; offset_x <= FILTER_SIZE; ++offset_x) {
+        for(int offset_y = -FILTER_SIZE; offset_y <= FILTER_SIZE; ++offset_y) {
+            int2 offset = {offset_x, offset_y};
+            float diff = (float)read_imageui(imageInput, sampler, pos1 + offset).x/255.0f - (float)read_imageui(imageInput, sampler, pos2 + offset).x/255.0f;
+            diff = diff*diff;
+            res += diff;
+        }
+    }
+    return res;
+}
+
 __kernel void nonLocalMeansFilter(
         __read_only image2d_t imageInput,
         __write_only image2d_t imageOutput,
@@ -17,18 +30,7 @@ __kernel void nonLocalMeansFilter(
     float sumTop = 0.0f;
 
 
-float calculateDiff(__read_only image2d_t imageInput, int2 pos1, int2 pos2, int filterSize, int iteration) {
-    float res = 0.0f;
-    for(int offset_x = -FILTER_SIZE; offset_x <= FILTER_SIZE; ++offset_x) {
-        for(int offset_y = -FILTER_SIZE; offset_y <= FILTER_SIZE; ++offset_y) {
-            int2 offset = {offset_x, offset_y};
-            float diff = (float)read_imageui(imageInput, sampler, pos1 + offset).x/255.0f - (float)read_imageui(imageInput, sampler, pos2 + offset).x/255.0f;
-            diff = diff*diff;
-            res += diff;
-        }
-    }
-    return res;
-}
+
 
     // Loop over search region
     for(int searchOffsetX = -SEARCH_SIZE; searchOffsetX <= SEARCH_SIZE; ++searchOffsetX) {
