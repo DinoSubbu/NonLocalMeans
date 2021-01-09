@@ -10,7 +10,7 @@ float calculateDiff(__read_only image2d_t imageInput,
 		int2 pos2,
 		int filterSize,
 		int iteration) {
-	int FILTER_SIZE = 3;
+	int FILTER_SIZE = 1;
     float res = 0.0f;
     for(int offset_x = -FILTER_SIZE; offset_x <= FILTER_SIZE; ++offset_x) {
         for(int offset_y = -FILTER_SIZE; offset_y <= FILTER_SIZE; ++offset_y) {
@@ -23,7 +23,7 @@ float calculateDiff(__read_only image2d_t imageInput,
     return res;
 }
 
-__kernel void nonLocalMeansFilter(
+__kernel void nonLocalMeans(
         __read_only image2d_t imageInput,
 		__write_only image2d_t imageOutput,
         __private int searchSize,

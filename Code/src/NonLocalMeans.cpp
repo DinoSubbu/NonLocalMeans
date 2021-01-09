@@ -134,14 +134,13 @@ int main(int argc, char** argv) {
 	*/
 	// Use an image (Valve.pgm) as input data
 	std::size_t inputWidth, inputHeight;
-	{
-		std::vector<float> inputData;
-		
-		Core::readImagePGM("Valve.pgm", inputData, inputWidth, inputHeight);
-		for (size_t j = 0; j < countY; j++) {
-			for (size_t i = 0; i < countX; i++) {
-				h_input[i + countX * j] = inputData[(i % inputWidth) + inputWidth * (j % inputHeight)];
-			}
+	std::vector<float> inputData;
+
+	Core::readImagePGM("Valve.pgm", inputData, inputWidth, inputHeight);
+	std::cout<<"Width:: "<<inputWidth;
+	for (size_t j = 0; j < countY; j++) {
+		for (size_t i = 0; i < countX; i++) {
+			h_input[i + countX * j] = inputData[(i % inputWidth) + inputWidth * (j % inputHeight)];
 		}
 	}
 
@@ -193,9 +192,9 @@ int main(int argc, char** argv) {
             cl::NullRange
         );
 
-		//auto tmp = d_input;
-		//d_input = d_output;
-		//d_output = tmp;
+		auto tmp = d_input;
+		d_input = d_output;
+		d_output = tmp;
 
 	}
 		// Copy output data back to host
@@ -207,6 +206,7 @@ int main(int argc, char** argv) {
 		//TODO
 
 		//////// Store GPU output image ///////////////////////////////////
+		std::cout<<"Creating Output Image"<<std::endl;
 		Core::writeImagePGM("output_nonlocal_gpu.pgm", h_outputGpu, countX, countY);
 
 		// Check whether results are correct
