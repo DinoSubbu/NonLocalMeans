@@ -103,7 +103,13 @@ int main(int argc, char** argv) {
 	std::vector<float> h_input (count);
 	std::vector<float> h_outputCpu (count);
 	std::vector<float> h_outputGpu (count);
+	
+	auto accessInput = input->getOpenCLImageAccess(ACCESS_READ, device);
+    auto accessOutput = output->getOpenCLImageAccess(ACCESS_READ_WRITE, device);
+    auto accessAux = auxImage->getOpenCLImageAccess(ACCESS_READ_WRITE, device);
 
+    auto bufferIn = accessInput->get2DImage();
+    auto bufferOut = accessAux->get2DImage();
 	// Allocate space for input and output data on the device
 	//TODO
 	cl::Image2D d_input(context, CL_MEM_READ_WRITE,cl::ImageFormat(CL_R,CL_FLOAT),countX,countY);
@@ -123,8 +129,11 @@ int main(int argc, char** argv) {
 	memset(h_outputCpu.data(), 255, size);
 	memset(h_outputGpu.data(), 255, size);
 	//TODO: GPU
-	queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
-	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
+	queue.enqueueWriteImage(bufferIn,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
+	queue.enqueueWriteImage(bufferOut,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
+	
+/* 		queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
+	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); */ //dinesh
 	//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
 	//queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
 
@@ -148,7 +157,9 @@ int main(int argc, char** argv) {
 
 	// Copy input data to device
 	//TODO
-	queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
+	queue.enqueueWriteImage(bufferIn,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
+//	queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
+
 	//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
 
 	// Do calculation on the host side
@@ -160,17 +171,14 @@ int main(int argc, char** argv) {
 	// Reinitialize output memory to 0xff
 	memset(h_outputGpu.data(), 255, size);
 	//TODO: GPU
-	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
+//	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); // dinesh
+
+	queue.enqueueWriteImage(bufferOut,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); //priya
 	//queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
     cl::Kernel kernelPreProcess(program, "preprocess");
 
 	std::cout << std::endl;
-	auto accessInput = input->getOpenCLImageAccess(ACCESS_READ, device);
-    auto accessOutput = output->getOpenCLImageAccess(ACCESS_READ_WRITE, device);
-    auto accessAux = auxImage->getOpenCLImageAccess(ACCESS_READ_WRITE, device);
 
-    auto bufferIn = accessInput->get2DImage();
-    auto bufferOut = accessAux->get2DImage();
 	
 	if(m_preProcess) 
 	{
@@ -239,7 +247,10 @@ int main(int argc, char** argv) {
 	}
 		// Copy output data back to host
 		//TODO
-		queue.enqueueReadImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
+		//queue.enqueueReadImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); //dinesh
+		
+		queue.enqueueReadImage(bufferOut,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); // priya
+
 		//queue.enqueueReadBuffer(d_output, true, 0, size, h_outputGpu.data(), NULL, NULL);
 	
 		// Print performance data
