@@ -51,6 +51,7 @@ void sobelHost(const std::vector<float>& h_input, std::vector<float>& h_outputCp
 int main(int argc, char** argv) {
 	// Create a context	
 	//cl::Context context(CL_DEVICE_TYPE_GPU);
+
 	std::vector<cl::Platform> platforms;
 	cl::Platform::get(&platforms);
 	if (platforms.size() == 0) {
@@ -103,9 +104,10 @@ int main(int argc, char** argv) {
 
 	// Allocate space for input and output data on the device
 	//TODO
-	//cl::Image2D d_input(context, CL_MEM_READ_ONLY,cl::ImageFormat(CL_R,CL_FLOAT),countX,countY);
-	cl::Buffer d_input(context, CL_MEM_READ_WRITE,size);
-	cl::Buffer d_output(context, CL_MEM_READ_WRITE,size);
+	cl::Image2D d_input(context, CL_MEM_READ_WRITE,cl::ImageFormat(CL_R,CL_FLOAT),countX,countY);
+	cl::Image2D d_output(context, CL_MEM_READ_WRITE,cl::ImageFormat(CL_R,CL_FLOAT),countX,countY);
+	//cl::Buffer d_input(context, CL_MEM_READ_WRITE,size);
+	//cl::Buffer d_output(context, CL_MEM_READ_WRITE,size);
 	cl::size_t<3> origin;
 	origin[0] = origin[1] = origin[2] = 0;
 
@@ -119,9 +121,10 @@ int main(int argc, char** argv) {
 	memset(h_outputCpu.data(), 255, size);
 	memset(h_outputGpu.data(), 255, size);
 	//TODO: GPU
-	//queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
-	queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
-	queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
+	queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
+	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
+	//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
+	//queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
 
 	//////// Load input data ////////////////////////////////
 	// Use random input data
@@ -144,7 +147,8 @@ int main(int argc, char** argv) {
 
 	// Copy input data to device
 	//TODO
-	queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
+	queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
+	//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
 
 	// Do calculation on the host side
 	//sobelHost(h_input, h_outputCpu, countX, countY);
@@ -155,7 +159,8 @@ int main(int argc, char** argv) {
 	// Reinitialize output memory to 0xff
 	memset(h_outputGpu.data(), 255, size);
 	//TODO: GPU
-	queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
+	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
+	//queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
 
 	std::cout << std::endl;
 	// Iterate over all implementations (task 1 - 3)
@@ -171,9 +176,15 @@ int main(int argc, char** argv) {
 
 		// Launch kernel on the device
 		//TODO
-		kernelNonLocal.setArg(0, d_input);
-		kernelNonLocal.setArg(1, d_output);
-		// To decide and add other kernel args
+		const int m_searchSize = 11;
+		const int m_filterSize = 3;
+		const int m_parameterH = 0.15f;
+		kernelNonLocal.setArg<cl::Image2D>(0, d_input);
+		kernelNonLocal.setArg<cl::Image2D>(1, d_output);
+		kernelNonLocal.setArg(2, m_searchSize);
+		kernelNonLocal.setArg(3, (m_filterSize - 1)/2);
+		kernelNonLocal.setArg(4, m_parameterH*(1.0f/(float)std::pow(2, iteration)));
+		kernelNonLocal.setArg(5, iteration); // iteration
 
         queue.enqueueNDRangeKernel(
             kernelNonLocal,
@@ -182,14 +193,15 @@ int main(int argc, char** argv) {
             cl::NullRange
         );
 
-		auto tmp = d_input;
-		d_input = d_output;
-		d_output = tmp;
+		//auto tmp = d_input;
+		//d_input = d_output;
+		//d_output = tmp;
 
 	}
 		// Copy output data back to host
 		//TODO
-		queue.enqueueReadBuffer(d_output, true, 0, size, h_outputGpu.data(), NULL, NULL);
+		queue.enqueueReadImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
+		//queue.enqueueReadBuffer(d_output, true, 0, size, h_outputGpu.data(), NULL, NULL);
 	
 		// Print performance data
 		//TODO
