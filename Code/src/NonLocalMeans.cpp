@@ -48,6 +48,8 @@ void sobelHost(const std::vector<float>& h_input, std::vector<float>& h_outputCp
 //////////////////////////////////////////////////////////////////////////////
 // Main function
 //////////////////////////////////////////////////////////////////////////////
+bool m_preProcess = true;
+
 int main(int argc, char** argv) {
 	// Create a context	
 	//cl::Context context(CL_DEVICE_TYPE_GPU);
@@ -160,8 +162,42 @@ int main(int argc, char** argv) {
 	//TODO: GPU
 	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
 	//queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
+    cl::Kernel kernelPreProcess(program, "preprocess");
 
 	std::cout << std::endl;
+	auto accessInput = input->getOpenCLImageAccess(ACCESS_READ, device);
+    auto accessOutput = output->getOpenCLImageAccess(ACCESS_READ_WRITE, device);
+    auto accessAux = auxImage->getOpenCLImageAccess(ACCESS_READ_WRITE, device);
+
+    auto bufferIn = accessInput->get2DImage();
+    auto bufferOut = accessAux->get2DImage();
+	
+	if(m_preProcess) 
+	{
+        kernelPreProcess.setArg(0, *bufferIn);
+        kernelPreProcess.setArg(1, *bufferOut);
+        queue.enqueueNDRangeKernel(
+            kernelPreProcess,
+            cl::NullRange,
+            cl::NDRange(width, height),
+            cl::NullRange
+        );
+
+        bufferIn = bufferOut;
+        bufferOut = accessOutput->get2DImage();
+		
+    } else {
+        queue.enqueueCopyImage(
+            *bufferIn,
+            *bufferOut,
+            createOrigoRegion(),
+            createOrigoRegion(),
+            createRegion(width, height, 1)
+        );
+        bufferIn = bufferOut;
+        bufferOut = accessOutput->get2DImage();
+    }
+
 	// Iterate over all implementations (task 1 - 3)
 	for (int iteration = 0; iteration < 3; ++iteration) 
 	{
@@ -178,8 +214,10 @@ int main(int argc, char** argv) {
 		const int m_searchSize = 11;
 		const int m_filterSize = 3;
 		const int m_parameterH = 0.15f;
-		kernelNonLocal.setArg<cl::Image2D>(0, d_input);
-		kernelNonLocal.setArg<cl::Image2D>(1, d_output);
+		kernelNonLocal.setArg(0, *bufferIn);
+        kernelNonLocal.setArg(1, *bufferOut);
+//		kernelNonLocal.setArg<cl::Image2D>(0, d_input);
+//		kernelNonLocal.setArg<cl::Image2D>(1, d_output);
 		kernelNonLocal.setArg(2, m_searchSize);
 		kernelNonLocal.setArg(3, (m_filterSize - 1)/2);
 		kernelNonLocal.setArg(4, m_parameterH*(1.0f/(float)std::pow(2, iteration)));
@@ -191,10 +229,12 @@ int main(int argc, char** argv) {
             cl::NDRange(inputWidth, inputHeight),
             cl::NullRange
         );
-
-		auto tmp = d_input;
+        auto tmp = bufferIn;
+        bufferIn = bufferOut;
+        bufferOut = tmp;
+/* 		auto tmp = d_input;
 		d_input = d_output;
-		d_output = tmp;
+		d_output = tmp; */
 
 	}
 		// Copy output data back to host
