@@ -20,28 +20,50 @@
 
 #include <boost/lexical_cast.hpp>
 
+using namespace std;
+
 //////////////////////////////////////////////////////////////////////////////
-// CPU implementation
+// CPU implementation of NonLocal Means Algorithm
 //////////////////////////////////////////////////////////////////////////////
-int getIndexGlobal(std::size_t countX, int i, int j) {
-	return j * countX + i;
-}
-// Read value from global array a, return 0 if outside image
-float getValueGlobal(const std::vector<float>& a, std::size_t countX, std::size_t countY, int i, int j) {
-	if (i < 0 || (size_t) i >= countX || j < 0 || (size_t) j >= countY)
-		return 0;
-	else
-		return a[getIndexGlobal(countX, i, j)];
-}
-void sobelHost(const std::vector<float>& h_input, std::vector<float>& h_outputCpu, std::size_t countX, std::size_t countY) {
-	for (int i = 0; i < (int) countX; i++) {
-		for (int j = 0; j < (int) countY; j++) {
-			float Gx = getValueGlobal(h_input, countX, countY, i-1, j-1)+2*getValueGlobal(h_input, countX, countY, i-1, j)+getValueGlobal(h_input, countX, countY, i-1, j+1)
-					-getValueGlobal(h_input, countX, countY, i+1, j-1)-2*getValueGlobal(h_input, countX, countY, i+1, j)-getValueGlobal(h_input, countX, countY, i+1, j+1);
-			float Gy = getValueGlobal(h_input, countX, countY, i-1, j-1)+2*getValueGlobal(h_input, countX, countY, i, j-1)+getValueGlobal(h_input, countX, countY, i+1, j-1)
-					-getValueGlobal(h_input, countX, countY, i-1, j+1)-2*getValueGlobal(h_input, countX, countY, i, j+1)-getValueGlobal(h_input, countX, countY, i+1, j+1);
-			h_outputCpu[getIndexGlobal(countX, i, j)] = sqrt(Gx * Gx + Gy * Gy);
-		}
+void nlmHost()
+{
+	// Have to figure out how to pass arguments
+	// Add dimensions of the image
+
+	cout<<"Starting to run nlm algorithm on cpu"<<endl;
+
+	for(int i=0; i<height - patchW + 1; i++)
+	{
+	   for(int j=0; j<width - patchW + 1; j++)
+	   {
+	      for(int k=i; k<height - patchW + 1; k++)
+	      {
+	         for(int l=0; l<width - patchW + 1; l++)
+	         {
+                if(l != j)
+	            {
+	              float v = 0;
+                  for(int p=k; p<k+patchW; p++)
+	              {
+	                 for(int q=l; q<l+patchW; q++)
+	                 {
+	                    // Euclidean distance distance calculation
+	                	 v += (h_input[i+p-k][j+q-l] - h_input[p][q]) * (h_input[i+p-k][j+q-l] - h_input[p][q]);
+	                 }
+	              }
+
+                  // Weight matrix calculation => exp(-v/h^²)
+	              float w = exp(-v/(h*h));
+
+	              // Multiply pixels with weight matrix and add them up!
+				  h_temp[i][j] += w * h_input[k][l];
+				  C[i][j] += w;
+				  h_temp[k][l] += w * h_input[i][j];
+				  C[k][l] += w;
+	           }
+	         }
+	     }
+	   }
 	}
 }
 
