@@ -2,13 +2,21 @@
 #include <OpenCL/OpenCLKernel.hpp> // Hack to make syntax highlighting in Eclipse work
 #endif
 
-const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
+
+#define imgH 480
+#define imgW 640
+#define h 1
+#define patchW 3
 
 
-__kernel void NonLocalMeans(float* img, float* imgTemp, float* C)
+
+__kernel void NonLocalMeansFilter(float* img, float* imgTemp, float* C)
 
  { 
   
+	int j = get_global_id(1);
+	int i = get_global_id(0);
+
  for(int k=i; k<imgH - patchW + 1; k++)
   {
     for(int l=0; l<imgW - patchW + 1; l++)
@@ -37,4 +45,3 @@ __kernel void NonLocalMeans(float* img, float* imgTemp, float* C)
       }
   }
 } 
-}
