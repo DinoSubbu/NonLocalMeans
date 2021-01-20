@@ -22,18 +22,28 @@
 
 using namespace std;
 
+// TODO: Remove constants later
+int imgWidth = 640;
+int imgHeight = 480;
+
 //////////////////////////////////////////////////////////////////////////////
 // CPU implementation of NonLocal Means Algorithm
 //////////////////////////////////////////////////////////////////////////////
-void nlmHost()
+void nlmHost(float h_input[][640],
+			float** h_outputCpu,
+			const float h,
+			const int patchW,
+			const int width,
+			const int height)
 {
-	// Have to figure out how to pass arguments
-	// Add dimensions of the image
 
 	cout<<"Starting to run nlm algorithm on cpu"<<endl;
 
+	float h_temp[height][width], C[height][width];
+
 	for(int i=0; i<height - patchW + 1; i++)
 	{
+		std::cout<<"Debug:: I VALUE: "<<i<<std::endl;
 	   for(int j=0; j<width - patchW + 1; j++)
 	   {
 	      for(int k=i; k<height - patchW + 1; k++)
@@ -185,7 +195,9 @@ int main(int argc, char** argv) {
 	//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
 
 	// Do calculation on the host side
-	//sobelHost(h_input, h_outputCpu, countX, countY);
+	float h = 1;
+	int patchW = 3;
+	nlmHost(h_input, h_outputCpu, h, patchW, inputWidth, inputHeight);
 
 	//////// Store CPU output image ///////////////////////////////////
 	//Core::writeImagePGM("output_sobel_cpu.pgm", h_outputCpu, countX, countY);
