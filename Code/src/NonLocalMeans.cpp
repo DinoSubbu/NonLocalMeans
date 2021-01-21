@@ -80,8 +80,6 @@ void nlmHost(float h_input[][640],
 //////////////////////////////////////////////////////////////////////////////
 // Main function
 //////////////////////////////////////////////////////////////////////////////
-bool m_preProcess = true;
-
 int main(int argc, char** argv) {
 	// Create a context	
 	//cl::Context context(CL_DEVICE_TYPE_GPU);
@@ -119,66 +117,45 @@ int main(int argc, char** argv) {
 
 	// Load the source code
 	cl::Program program = OpenCL::loadProgramSource(context, "src/NonLocalMeans.cl");
+	
 	// Compile the source code. This is similar to program.build(devices) but will print more detailed error messages
 	OpenCL::buildProgram(program, devices);
 
 	// Declare some values
-	std::size_t wgSizeX = 16; // Number of work items per work group in X direction
+	// todo use this variables later
+/* 	std::size_t wgSizeX = 16; // Number of work items per work group in X direction
 	std::size_t wgSizeY = 16;
 	std::size_t countX = wgSizeX * 40; // Overall number of work items in X direction = Number of elements in X direction
 	std::size_t countY = wgSizeY * 30;
 	//countX *= 3; countY *= 3;
 	std::size_t count = countX * countY; // Overall number of elements
-	std::size_t size = count * sizeof (float); // Size of data in bytes
+	std::size_t size = count * sizeof (float); // Size of data in bytes */
 
-	// Allocate space for output data from CPU and GPU on the host
-	std::vector<float> h_input (count);
-	std::vector<float> h_outputCpu (count);
-	std::vector<float> h_outputGpu (count);
-	
-	auto accessInput = input->getOpenCLImageAccess(ACCESS_READ, device);
-    auto accessOutput = output->getOpenCLImageAccess(ACCESS_READ_WRITE, device);
-    auto accessAux = auxImage->getOpenCLImageAccess(ACCESS_READ_WRITE, device);
-
-    auto bufferIn = accessInput->get2DImage();
-    auto bufferOut = accessAux->get2DImage();
-	// Allocate space for input and output data on the device
-	//TODO
-	cl::Image2D d_input(context, CL_MEM_READ_WRITE,cl::ImageFormat(CL_R,CL_FLOAT),countX,countY);
-	cl::Image2D d_output(context, CL_MEM_READ_WRITE,cl::ImageFormat(CL_R,CL_FLOAT),countX,countY);
-	//cl::Buffer d_input(context, CL_MEM_READ_WRITE,size);
-	//cl::Buffer d_output(context, CL_MEM_READ_WRITE,size);
-	cl::size_t<3> origin;
-	origin[0] = origin[1] = origin[2] = 0;
-
-	cl::size_t<3> region;
-	region[0] = countX;
-	region[1] = countY;
-	region[2] = 1;
-
-	// Initialize memory to 0xff (useful for debugging because otherwise GPU memory will contain information from last execution)
-	memset(h_input.data(), 255, size);
-	memset(h_outputCpu.data(), 255, size);
-	memset(h_outputGpu.data(), 255, size);
-	//TODO: GPU
-	queue.enqueueWriteImage(bufferIn,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
-	queue.enqueueWriteImage(bufferOut,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL);
-	
-/* 		queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
-	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); */ //dinesh
-	//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
-	//queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
-
-	//////// Load input data ////////////////////////////////
-	// Use random input data
-	/*
-	for (int i = 0; i < count; i++)
-		h_input[i] = (rand() % 100) / 5.0f - 10.0f;
-	*/
 	// Use an image (Valve.pgm) as input data
 	std::size_t inputWidth, inputHeight;
 	std::vector<float> inputData;
+	
+	// Allocate space for output data from CPU and GPU on the host, @ dinesh 
+	float h_input[imgHeight][imgWidth] = {0}, h_outputGpu[imgHeight][imgWidth] = {0};
 
+	// Allocate space for input and output data on the device
+	cl::Buffer d_Img(context, CL_MEM_READ_WRITE, inputWidth * inputHeight * sizeof(float) );
+    cl::Buffer d_ImgTemp(context, CL_MEM_READ_WRITE,inputWidth * inputHeight * sizeof(float) );
+    cl::Buffer d_C(context, CL_MEM_READ_WRITE, inputWidth * inputHeight * sizeof(float) );
+
+	// Initialize memory to 0xff (useful for debugging because otherwise GPU memory will contain information from last execution)
+    memset(h_input, 255, inputWidth * inputHeight * sizeof(float));
+    memset(h_outputGpu, 255, inputWidth * inputHeight * sizeof(float));
+    memset(h_outputCpu, 255, inputWidth * inputHeight * sizeof(float));
+	
+	//TODO: GPU
+    queue.enqueueWriteBuffer(d_Img,true,0,inputWidth * inputHeight * sizeof(float), h_input);
+    queue.enqueueWriteBuffer(d_ImgTemp,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu);
+    queue.enqueueWriteBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu);
+
+	//////// Load input data ////////////////////////////////
+	std::cout<<"inputWidth:: "<<inputWidth;
+	std::cout<<"inputHeight:: "<<inputHeight;
 	Core::readImagePGM("Valve.pgm", inputData, inputWidth, inputHeight);
 	std::cout<<"Width:: "<<inputWidth;
 	for (size_t j = 0; j < countY; j++) {
@@ -188,11 +165,7 @@ int main(int argc, char** argv) {
 	}
 
 	// Copy input data to device
-	//TODO
-	queue.enqueueWriteImage(bufferIn,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
-//	queue.enqueueWriteImage(d_input,true,origin,region,countX *(sizeof(float)),0,h_input.data(),NULL,NULL);
-
-	//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
+	queue.enqueueWriteBuffer(d_Img,true,0,inputWidth * inputHeight * sizeof(float),h_input);
 
 	// Do calculation on the host side
 	float h = 1;
@@ -200,109 +173,56 @@ int main(int argc, char** argv) {
 	nlmHost(h_input, h_outputCpu, h, patchW, inputWidth, inputHeight);
 
 	//////// Store CPU output image ///////////////////////////////////
-	//Core::writeImagePGM("output_sobel_cpu.pgm", h_outputCpu, countX, countY);
+	// h_outputCpuVector declaration
+	Core::writeImagePGM("output_nlm_cpu.pgm", h_outputCpuVector, inputHeight, inputWidth);
+	std::cout<<"Image written"<<std::endl;
 
 	// Reinitialize output memory to 0xff
-	memset(h_outputGpu.data(), 255, size);
-	//TODO: GPU
-//	queue.enqueueWriteImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); // dinesh
+	memset(h_outputGpu, 255, inputWidth * inputHeight * sizeof(float));
 
-	queue.enqueueWriteImage(bufferOut,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); //priya
-	//queue.enqueueWriteBuffer(d_output, true, 0, size,h_outputGpu.data());
-    cl::Kernel kernelPreProcess(program, "preprocess");
+	//GPU
+	queue.enqueueWriteBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu);	
+
+	// Copy input data to device
+	queue.enqueueWriteBuffer(d_Img, true, 0, inputWidth * inputHeight * sizeof(float),h_input);
+
+    // Create a kernel object
+    std::cout<<"Creating kernel object"<<std::endl;
+	cl::Kernel NLM(program, "NonLocalMeansFilter");
 
 	std::cout << std::endl;
-
 	
-	if(m_preProcess) 
-	{
-        kernelPreProcess.setArg(0, *bufferIn);
-        kernelPreProcess.setArg(1, *bufferOut);
-        queue.enqueueNDRangeKernel(
-            kernelPreProcess,
-            cl::NullRange,
-            cl::NDRange(width, height),
-            cl::NullRange
-        );
+	// Launch kernel on the device
+     NLM.setArg<cl::Buffer>(0, d_Img);
+     NLM.setArg<cl::Buffer>(1, d_ImgTemp);
+     NLM.setArg<cl::Buffer>(2, d_C);
 
-        bufferIn = bufferOut;
-        bufferOut = accessOutput->get2DImage();
-		
-    } else {
-        queue.enqueueCopyImage(
-            *bufferIn,
-            *bufferOut,
-            createOrigoRegion(),
-            createOrigoRegion(),
-            createRegion(width, height, 1)
-        );
-        bufferIn = bufferOut;
-        bufferOut = accessOutput->get2DImage();
-    }
+	 //range check
+     queue.enqueueNDRangeKernel(NLM,
+                            cl::NullRange,
+                            cl::NullRange,
+                            cl::NullRange
+                        );
 
-	// Iterate over all implementations (task 1 - 3)
-	for (int iteration = 0; iteration < 3; ++iteration) 
-	{
-		
-		// Copy input data to device
-		//TODO
-		//queue.enqueueWriteBuffer(d_input, true, 0, size,h_input.data());
+    // Copy output data back to host
+    queue.enqueueReadBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu,NULL,NULL);
 
-		// Create a kernel object
-		cl::Kernel kernelNonLocal(program, "nonLocalMeans");
+	// Print performance data
+    //TODO
 
-		// Launch kernel on the device
-		//TODO
-		const int m_searchSize = 11;
-		const int m_filterSize = 3;
-		const int m_parameterH = 0.15f;
-		kernelNonLocal.setArg(0, *bufferIn);
-        kernelNonLocal.setArg(1, *bufferOut);
-//		kernelNonLocal.setArg<cl::Image2D>(0, d_input);
-//		kernelNonLocal.setArg<cl::Image2D>(1, d_output);
-		kernelNonLocal.setArg(2, m_searchSize);
-		kernelNonLocal.setArg(3, (m_filterSize - 1)/2);
-		kernelNonLocal.setArg(4, m_parameterH*(1.0f/(float)std::pow(2, iteration)));
-		kernelNonLocal.setArg(5, iteration); // iteration
+	//////// Store GPU output image ///////////////////////////////////
+	std::cout<<"Creating Output Image"<<std::endl;
+	Core::writeImagePGM("output_nonlocal_gpu.pgm", h_outputGpu, inputWidth, inputHeight);
 
-        queue.enqueueNDRangeKernel(
-            kernelNonLocal,
-            cl::NullRange,
-            cl::NDRange(inputWidth, inputHeight),
-            cl::NullRange
-        );
-        auto tmp = bufferIn;
-        bufferIn = bufferOut;
-        bufferOut = tmp;
-/* 		auto tmp = d_input;
-		d_input = d_output;
-		d_output = tmp; */
-
-	}
-		// Copy output data back to host
-		//TODO
-		//queue.enqueueReadImage(d_output,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); //dinesh
-		
-		queue.enqueueReadImage(bufferOut,true,origin,region,countX *(sizeof(float)),0,h_outputGpu.data(),NULL,NULL); // priya
-
-		//queue.enqueueReadBuffer(d_output, true, 0, size, h_outputGpu.data(), NULL, NULL);
-	
-		// Print performance data
-		//TODO
-
-		//////// Store GPU output image ///////////////////////////////////
-		std::cout<<"Creating Output Image"<<std::endl;
-		Core::writeImagePGM("output_nonlocal_gpu.pgm", h_outputGpu, countX, countY);
-
-		// Check whether results are correct
-		std::size_t errorCount = 0;
-		for (size_t i = 0; i < countX; i = i + 1) { //loop in the x-direction
-			for (size_t j = 0; j < countY; j = j + 1) { //loop in the y-direction
-				size_t index = i + j * countX;
-				// Allow small differences between CPU and GPU results (due to different rounding behavior)
-				if (!(std::abs (h_outputCpu[index] - h_outputGpu[index]) <= 1e-5)) {
-					if (errorCount < 15)
-						std::cout << "Result for " << i << "," << j << " is incorrect: GPU value is " << h_outputGpu[index] << ", CPU value is " << h_outputCpu[index] << std::endl;
+	// Check whether results are correct
+	std::size_t errorCount = 0;
+	for (size_t i = 0; i < countX; i = i + 1) { //loop in the x-direction
+		for (size_t j = 0; j < countY; j = j + 1) { //loop in the y-direction
+			size_t index = i + j * countX;
+			// Allow small differences between CPU and GPU results (due to different rounding behavior)
+			if (!(std::abs (h_outputCpu[index] - h_outputGpu[index]) <= 1e-5)) {
+				if (errorCount < 15)
+					std::cout << "Result for " << i << "," << j << " is incorrect: GPU value is " << h_outputGpu[index] << ", CPU value is " << h_outputCpu[index] << std::endl;
 					else if (errorCount == 15)
 						std::cout << "..." << std::endl;
 					errorCount++;

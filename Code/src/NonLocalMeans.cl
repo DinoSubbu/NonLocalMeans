@@ -2,13 +2,14 @@
 #include <OpenCL/OpenCLKernel.hpp> // Hack to make syntax highlighting in Eclipse work
 #endif
 
+//////////////////////////////////////////////////////////////////////////////
+// kernel implementation of NonLocal Means Algorithm
+//////////////////////////////////////////////////////////////////////////////
 
 #define imgH 480
 #define imgW 640
 #define h 1
 #define patchW 3
-
-
 
 __kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp, __global float* C)
 { 
