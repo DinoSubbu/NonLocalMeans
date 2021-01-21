@@ -10,9 +10,8 @@
 
 
 
-__kernel void NonLocalMeansFilter(float* img, float* imgTemp, float* C)
-
- { 
+__kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp, __global float* C)
+{ 
   
 	int j = get_global_id(1);
 	int i = get_global_id(0);
