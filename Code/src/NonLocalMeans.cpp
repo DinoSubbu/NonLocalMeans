@@ -135,8 +135,12 @@ int main(int argc, char** argv) {
 	std::size_t inputWidth, inputHeight;
 	std::vector<float> inputData;
 	
-	// Allocate space for output data from CPU and GPU on the host, @ dinesh 
-	float h_input[imgHeight][imgWidth] = {0}, h_outputGpu[imgHeight][imgWidth] = {0};
+	// Allocate space for output data from CPU and GPU on the host
+	float h_input[480][640] = {0}, h_outputGpu[480][640] = {0};
+	float** h_outputCpu;
+	h_outputCpu = new float*[480];
+	for(int i = 0; i <480; i++)
+		h_outputCpu[i] = new float[640];
 
 	// Allocate space for input and output data on the device
 	cl::Buffer d_Img(context, CL_MEM_READ_WRITE, inputWidth * inputHeight * sizeof(float) );
@@ -154,13 +158,13 @@ int main(int argc, char** argv) {
     queue.enqueueWriteBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu);
 
 	//////// Load input data ////////////////////////////////
+
+	Core::readImagePGM("Valve.pgm", inputData, inputWidth, inputHeight);
 	std::cout<<"inputWidth:: "<<inputWidth;
 	std::cout<<"inputHeight:: "<<inputHeight;
-	Core::readImagePGM("Valve.pgm", inputData, inputWidth, inputHeight);
-	std::cout<<"Width:: "<<inputWidth;
-	for (size_t j = 0; j < countY; j++) {
-		for (size_t i = 0; i < countX; i++) {
-			h_input[i + countX * j] = inputData[(i % inputWidth) + inputWidth * (j % inputHeight)];
+	for (size_t j = 0; j < inputHeight; j++) {
+		for (size_t i = 0; i < inputWidth; i++) {
+			h_input[i][j] = inputData[i + inputWidth *j];
 		}
 	}
 
@@ -171,6 +175,14 @@ int main(int argc, char** argv) {
 	float h = 1;
 	int patchW = 3;
 	nlmHost(h_input, h_outputCpu, h, patchW, inputWidth, inputHeight);
+
+	// Copy back the CPU output from array to vector
+	std::vector<float> h_outputCpuVector(inputHeight*inputWidth);
+	for (size_t i = 0; i < inputHeight; i++) {
+			for (size_t j = 0; j < inputWidth; j++) {
+				h_outputCpuVector[i + inputWidth * j] = h_outputCpu[i][j];
+			}
+		}
 
 	//////// Store CPU output image ///////////////////////////////////
 	// h_outputCpuVector declaration
@@ -199,10 +211,10 @@ int main(int argc, char** argv) {
 
 	 //range check
      queue.enqueueNDRangeKernel(NLM,
-                            cl::NullRange,
-                            cl::NullRange,
-                            cl::NullRange
-                        );
+								cl::NullRange,
+								cl::NDRange(inputHeight-2, inputWidth-2),
+								cl::NullRange
+                        		);
 
     // Copy output data back to host
     queue.enqueueReadBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu,NULL,NULL);
@@ -212,7 +224,14 @@ int main(int argc, char** argv) {
 
 	//////// Store GPU output image ///////////////////////////////////
 	std::cout<<"Creating Output Image"<<std::endl;
-	Core::writeImagePGM("output_nonlocal_gpu.pgm", h_outputGpu, inputWidth, inputHeight);
+	std::cout<<"Creating Output Image GPU"<<std::endl;
+	std::vector<float> h_outputGpuVector;
+		for (size_t i = 0; i < inputHeight; i++) {
+				for (size_t j = 0; j < inputWidth; j++) {
+					h_outputGpuVector[i + inputWidth * j] = h_outputGpu[i][j];
+				}
+			}
+	Core::writeImagePGM("output_nonlocal_gpu.pgm", h_outputGpuVector, inputWidth, inputHeight);
 
 	// Check whether results are correct
 	std::size_t errorCount = 0;
