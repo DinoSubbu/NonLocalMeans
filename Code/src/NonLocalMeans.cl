@@ -44,4 +44,11 @@ __kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp, 
         }
       }
   }
+ for(int i=0; i<imgH - patchW + 1; i++)
+	{
+	  for(int j=0; j<imgW - patchW + 1; j++)
+	  {
+		  //h_outputCpu[i+ imgH*j] = (imgTemp[i][j])/(C[i][j]);
+	  }
+	}
 } 
