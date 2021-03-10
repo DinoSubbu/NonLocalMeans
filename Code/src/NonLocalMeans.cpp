@@ -95,8 +95,6 @@ void nlmHost(std::vector<float>& h_input,
 // Main function
 //////////////////////////////////////////////////////////////////////////////
 int main(int argc, char** argv) {
-	// Create a context	
-	//cl::Context context(CL_DEVICE_TYPE_GPU);
 
 	std::vector<cl::Platform> platforms;
 	cl::Platform::get(&platforms);
@@ -162,6 +160,7 @@ int main(int argc, char** argv) {
 	// Allocate space for input and output data on the device
 	cl::Buffer d_Img(context, CL_MEM_READ_WRITE, inputWidth * inputHeight * sizeof(float) );
     cl::Buffer d_ImgTemp(context, CL_MEM_READ_WRITE,inputWidth * inputHeight * sizeof(float) );
+	cl::Buffer d_ImgTemp1(context, CL_MEM_READ_WRITE,inputWidth * inputHeight * sizeof(float) );
     cl::Buffer d_C(context, CL_MEM_READ_WRITE, inputWidth * inputHeight * sizeof(float) );
 
 	// Initialize memory to 0xff (useful for debugging because otherwise GPU memory will contain information from last execution)
@@ -226,18 +225,18 @@ int main(int argc, char** argv) {
 	// Launch kernel on the device
      NLM.setArg<cl::Buffer>(0, d_Img);
      NLM.setArg<cl::Buffer>(1, d_ImgTemp);
-     NLM.setArg<cl::Buffer>(2, d_ImgTemp);
+     NLM.setArg<cl::Buffer>(2, d_ImgTemp1);
      NLM.setArg<cl::Buffer>(3, d_C);
 
 	 //range check
-     /*queue.enqueueNDRangeKernel(NLM,
+     queue.enqueueNDRangeKernel(NLM,
 								cl::NullRange,
 								cl::NDRange(inputHeight-2, inputWidth-2),
 								cl::NullRange
-                        		);*/
+                        		);
 
     // Copy output data back to host
-    queue.enqueueReadBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data(),NULL,NULL);
+    queue.enqueueReadBuffer(d_ImgTemp1,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data(),NULL,NULL);
 
 	// Print performance data
     //TODO
