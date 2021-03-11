@@ -11,7 +11,8 @@
 #define h 1
 #define patchW 3
 
-__kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp, __global float* C)
+__kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp,
+		__global float* outputCpu,__global float* C)
 { 
   
 	int j = get_global_id(1);
@@ -48,7 +49,7 @@ __kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp, 
 	{
 	  for(int j=0; j<imgW - patchW + 1; j++)
 	  {
-		  //h_outputCpu[i+ imgH*j] = (imgTemp[i][j])/(C[i][j]);
+		  outputCpu[i+ imgH*j] = (imgTemp[i][j])/(C[i][j]);
 	  }
 	}
 } 
