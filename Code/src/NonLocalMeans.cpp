@@ -17,7 +17,8 @@
 #include <sstream>
 #include <iostream>
 #include <cmath>
-
+#include <iomanip>
+#include <sstream>
 #include <boost/lexical_cast.hpp>
 
 using namespace std;
@@ -86,6 +87,34 @@ void nlmHost(std::vector<float>& h_input,
 
 	std::cout<<"Finishing host calculation"<<std::endl;
 }
+
+
+void printPerformanceHeader() {
+	std::cout << "Implementation           CPU       Calc       MT      GPU+MT  Speedup (w/o MT)" << std::endl;
+}
+
+void printPerformance(const std::string& name, Core::TimeSpan timeCalc, Core::TimeSpan timeMem, Core::TimeSpan timeCpu, bool showMem = true) {
+	Core::TimeSpan overallTime = timeCalc + timeMem;
+	std::stringstream str;
+	str << std::setiosflags (std::ios::left) << std::setw (20) << name;
+	str << std::setiosflags (std::ios::right);
+	str << " " << std::setw (9) << timeCpu;
+	str << " " << std::setw (9) << timeCalc;
+	if (showMem)
+		str << " " << std::setw (9) << timeMem;
+	else
+		str << " " << std::setw (9) << "";
+	str << " " << std::setw (9) << overallTime;
+	str << "  " << (timeCpu.getSeconds() / overallTime.getSeconds());
+	if (showMem)
+		str << " (" << (timeCpu.getSeconds() / timeCalc.getSeconds()) << ")";
+	std::cout << str.str () << std::endl;
+}
+
+void printPerformance(const std::string& name, Core::TimeSpan timeCalc, Core::TimeSpan timeCpu) {
+	printPerformance(name, timeCalc, Core::TimeSpan::fromSeconds(0), timeCpu, false);
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Main function
@@ -236,21 +265,22 @@ int main(int argc, char** argv) {
 		  }
 	 }
 
-    // Copy output data back to host
-    //queue.enqueueReadBuffer(d_ImgTemp1,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data(),NULL,NULL);
-
 	// Print performance data
-    //TODO
+    //TODO Uncomment later
+    /*Core::TimeSpan gpuTime = OpenCL::getElapsedTime(writeBufferATime);
+	Core::TimeSpan gpuTime = OpenCL::getElapsedTime(writeBufferBTime);
+	Core::TimeSpan gpuTime = OpenCL::getElapsedTime(kernelTime);
+	Core::TimeSpan copyTime = OpenCL::getElapsedTime(readBufferTime);
+	Core::TimeSpan gpuTime = writeBufferATime + writeBufferBTime + kernelTime + readBufferTime;
+	printPerformance(matrixMulKernel, gpuTime, copyTime, atlasTime);
+
+	std::cout << "GPU Time: " << gpuTime << std::endl;
+	std::cout << "CPU Time: " << cpuTime << std::endl;
+	std::cout << "Speedup: " << (double)cpuTime.getseconds()/ gpuTime.getseconds() << std::endl;
+	std::cout << "CPU Time: " << atlasTime << std::endl;*/
 
 	//////// Store GPU output image ///////////////////////////////////
-	std::cout<<"Creating Output Image"<<std::endl;
 	std::cout<<"Creating Output Image GPU"<<std::endl;
-	/*std::vector<float> h_outputGpuVector;
-		for (size_t i = 0; i < inputHeight; i++) {
-				for (size_t j = 0; j < inputWidth; j++) {
-					h_outputGpuVector[i + inputWidth * j] = h_outputGpu[i][j];
-				}
-			}*/
 	Core::writeImagePGM("output_nlm_gpu.pgm", h_outputGpu, inputWidth, inputHeight);
 
 	// Check whether results are correct
