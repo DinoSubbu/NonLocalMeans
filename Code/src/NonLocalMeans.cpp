@@ -245,8 +245,8 @@ int main(int argc, char** argv) {
 	 //range check
      queue.enqueueNDRangeKernel(NLM,
 								cl::NullRange,
-								//cl::NDRange(200-2, 200-2, 200-3),
-								cl::NDRange(inputHeight-2, inputWidth-2, inputHeight-2),
+								cl::NDRange(300-2, 300-2, 480-3),
+								//cl::NDRange(inputHeight-2, inputWidth-2, inputHeight-2),
 								cl::NullRange
                         		);
  	std::vector<float> h_imgTemp (count);
