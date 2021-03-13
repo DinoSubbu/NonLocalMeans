@@ -11,15 +11,12 @@
 #define h 1
 #define patchW 3
 
-__kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp,
-		__global float* outputCpu,__global float* C)
+__kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp,__global float* C)
 { 
   
-	int j = get_global_id(1);
 	int i = get_global_id(0);
-
- for(int k=i; k<imgH - patchW + 1; k++)
-  {
+	int j = get_global_id(1);
+	int k = get_global_id(2);
     for(int l=0; l<imgW - patchW + 1; l++)
     {
 
@@ -31,25 +28,17 @@ __kernel void NonLocalMeansFilter(__global float* img, __global float* imgTemp,
         {
           for(int q=l; q<l+patchW; q++)
           {
-            v += (img[(i+p-k)*imgW + j+q-l] - img[p*imgW + q]);
-            v = v*v;
+            v += (img[(i+p-k)*imgW + j+q-l] - img[p*imgW + q]) * (img[(i+p-k)*imgW + j+q-l] - img[p*imgW + q]);
           }
         }
 
-          float w = exp(-v/(h*h));
+         float w = exp(-v/(h*h));
 
 		 imgTemp[i*imgW + j] += w * img[k*imgW + l];
 	     C[i*imgW + j] += w;
 	     imgTemp[k*imgW + l] += w * img[i*imgW + j];
 	     C[k*imgW + l] += w;
-        }
-      }
-  }
- for(int i=0; i<imgH - patchW + 1; i++)
-	{
-	  for(int j=0; j<imgW - patchW + 1; j++)
-	  {
-		  outputCpu[i+ imgH*j] = (imgTemp[i][j])/(C[i][j]);
-	  }
-	}
+       }
+     }
+
 } 

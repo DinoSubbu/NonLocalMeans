@@ -39,9 +39,9 @@ void nlmHost(std::vector<float>& h_input,
 
 	cout<<"Starting to run nlm algorithm on cpu"<<endl;
 
-	float h_temp[height][width], C[height][width];
+	float h_temp[height][width] = {0}, C[height][width] = {0};
 
-	for(int i=0; i<height - patchW + 1; i++)
+	/*for(int i=0; i<height - patchW + 1; i++)
 	{
 		std::cout<<"Debug:: I VALUE: "<<i<<std::endl;
 	   for(int j=0; j<width - patchW + 1; j++)
@@ -74,7 +74,7 @@ void nlmHost(std::vector<float>& h_input,
 	         }
 	     }
 	   }
-	}
+	}*/
 
 	for(int i=0; i<height - patchW + 1; i++)
 		    {
@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
 	cl_context_properties prop[4] = { CL_CONTEXT_PLATFORM, (cl_context_properties) platforms[platformId] (), 0, 0 };
 	std::cout << "Using platform '" << platforms[platformId].getInfo<CL_PLATFORM_NAME>() << "' from '" << platforms[platformId].getInfo<CL_PLATFORM_VENDOR>() << "'" << std::endl;
 	cl::Context context(CL_DEVICE_TYPE_GPU, prop);
+	std::cout<<"Working"<<std::endl;
 
 
 	// Get a device of the context
@@ -156,11 +157,7 @@ int main(int argc, char** argv) {
 	// Allocate space for input and output data on the device
 	cl::Buffer d_Img(context, CL_MEM_READ_WRITE, inputWidth * inputHeight * sizeof(float) );
     cl::Buffer d_ImgTemp(context, CL_MEM_READ_WRITE,inputWidth * inputHeight * sizeof(float) );
-<<<<<<< HEAD
     cl::Buffer d_ImgTemp1(context, CL_MEM_READ_WRITE,inputWidth * inputHeight * sizeof(float) );
-=======
-	cl::Buffer d_ImgTemp1(context, CL_MEM_READ_WRITE,inputWidth * inputHeight * sizeof(float) );
->>>>>>> fd610a5acffe6314e050fd1608f17ddb950c8dad
     cl::Buffer d_C(context, CL_MEM_READ_WRITE, inputWidth * inputHeight * sizeof(float) );
 
 	// Initialize memory to 0xff (useful for debugging because otherwise GPU memory will contain information from last execution)
@@ -180,10 +177,10 @@ int main(int argc, char** argv) {
 	std::cout<<"inputHeight:: "<<inputHeight;
 	for (size_t j = 0; j < inputHeight; j++) {
 		for (size_t i = 0; i < inputWidth; i++) {
-			h_input[i + inputWidth * j] = inputData[(i % inputWidth) + inputWidth * (j % inputHeight)];
+			h_input[i + j* inputWidth] = inputData[(i % inputWidth) + (j % inputHeight)*inputWidth];
 		}
 	}
-
+	Core::writeImagePGM("input_nlm_cpu_test.pgm", h_input, inputWidth, inputHeight);
 	// Copy input data to device
 	queue.enqueueWriteBuffer(d_Img,true,0,inputWidth * inputHeight * sizeof(float),h_input.data());
 
@@ -197,13 +194,13 @@ int main(int argc, char** argv) {
 	std::cout<<"Image written"<<std::endl;
 
 	// Reinitialize output memory to 0xff
-	memset(h_outputGpu.data(), 255, inputWidth * inputHeight * sizeof(float));
+	memset(h_outputGpu.data(), 1.2, inputWidth * inputHeight * sizeof(float));
 
 	//GPU
 	queue.enqueueWriteBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data());
 
 	// Copy input data to device
-	queue.enqueueWriteBuffer(d_Img, true, 0, inputWidth * inputHeight * sizeof(float),h_input.data());
+	queue.enqueueWriteBuffer(d_ImgTemp, true, 0, inputWidth * inputHeight * sizeof(float),h_outputGpu.data());
 
     // Create a kernel object
     std::cout<<"Creating kernel object"<<std::endl;
@@ -214,22 +211,33 @@ int main(int argc, char** argv) {
 	// Launch kernel on the device
      NLM.setArg<cl::Buffer>(0, d_Img);
      NLM.setArg<cl::Buffer>(1, d_ImgTemp);
-     NLM.setArg<cl::Buffer>(2, d_ImgTemp1);
-     NLM.setArg<cl::Buffer>(3, d_C);
+     NLM.setArg<cl::Buffer>(2, d_C);
 
 	 //range check
      queue.enqueueNDRangeKernel(NLM,
 								cl::NullRange,
-								cl::NDRange(inputHeight-2, inputWidth-2),
-<<<<<<< HEAD
-								cl::NullRange);
-=======
+								//cl::NDRange(200-2, 200-2, 200-3),
+								cl::NDRange(inputHeight-2, inputWidth-2, inputHeight-2),
 								cl::NullRange
                         		);
->>>>>>> fd610a5acffe6314e050fd1608f17ddb950c8dad
+ 	std::vector<float> h_imgTemp (count);
+ 	std::vector<float> h_C (count);
+
+ 	queue.enqueueReadBuffer(d_ImgTemp,true,0,inputWidth * inputHeight * sizeof(float),h_imgTemp.data(),NULL,NULL);
+ 	queue.enqueueReadBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_C.data(),NULL,NULL);
+
+
+    for(std::size_t localI=0; localI<inputHeight - patchW + 1; localI++)
+	{
+    	std::cout<<h_imgTemp[localI + 1*inputWidth]<<std::endl;
+		  for(std::size_t localJ=0; localJ<inputWidth - patchW + 1; localJ++)
+		  {
+			  h_outputGpu[localI*inputWidth + localJ] = (h_imgTemp[localI*inputWidth + localJ])/(h_C[localI*inputWidth + localJ]);
+		  }
+	 }
 
     // Copy output data back to host
-    queue.enqueueReadBuffer(d_ImgTemp1,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data(),NULL,NULL);
+    //queue.enqueueReadBuffer(d_ImgTemp1,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data(),NULL,NULL);
 
 	// Print performance data
     //TODO
@@ -247,7 +255,7 @@ int main(int argc, char** argv) {
 
 	// Check whether results are correct
 	std::size_t errorCount = 0;
-	/*
+
 	for (size_t i = 0; i < countX; i = i + 1) { //loop in the x-direction
 		for (size_t j = 0; j < countY; j = j + 1) { //loop in the y-direction
 			size_t index = i + j * countX;
@@ -265,7 +273,6 @@ int main(int argc, char** argv) {
 			std::cout << "Found " << errorCount << " incorrect results" << std::endl;
 			return 1;
 		}
-*/
 		std::cout << std::endl;
 	
 
