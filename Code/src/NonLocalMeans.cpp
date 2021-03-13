@@ -42,7 +42,7 @@ void nlmHost(std::vector<float>& h_input,
 
 	float h_temp[height][width] = {0}, C[height][width] = {0};
 
-	/*for(int i=0; i<height - patchW + 1; i++)
+	for(int i=0; i<height - patchW + 1; i++)
 	{
 		std::cout<<"Debug:: I VALUE: "<<i<<std::endl;
 	   for(int j=0; j<width - patchW + 1; j++)
@@ -75,7 +75,7 @@ void nlmHost(std::vector<float>& h_input,
 	         }
 	     }
 	   }
-	}*/
+	}
 
 	for(int i=0; i<height - patchW + 1; i++)
 		    {
@@ -88,32 +88,6 @@ void nlmHost(std::vector<float>& h_input,
 	std::cout<<"Finishing host calculation"<<std::endl;
 }
 
-
-void printPerformanceHeader() {
-	std::cout << "Implementation           CPU       Calc       MT      GPU+MT  Speedup (w/o MT)" << std::endl;
-}
-
-void printPerformance(const std::string& name, Core::TimeSpan timeCalc, Core::TimeSpan timeMem, Core::TimeSpan timeCpu, bool showMem = true) {
-	Core::TimeSpan overallTime = timeCalc + timeMem;
-	std::stringstream str;
-	str << std::setiosflags (std::ios::left) << std::setw (20) << name;
-	str << std::setiosflags (std::ios::right);
-	str << " " << std::setw (9) << timeCpu;
-	str << " " << std::setw (9) << timeCalc;
-	if (showMem)
-		str << " " << std::setw (9) << timeMem;
-	else
-		str << " " << std::setw (9) << "";
-	str << " " << std::setw (9) << overallTime;
-	str << "  " << (timeCpu.getSeconds() / overallTime.getSeconds());
-	if (showMem)
-		str << " (" << (timeCpu.getSeconds() / timeCalc.getSeconds()) << ")";
-	std::cout << str.str () << std::endl;
-}
-
-void printPerformance(const std::string& name, Core::TimeSpan timeCalc, Core::TimeSpan timeCpu) {
-	printPerformance(name, timeCalc, Core::TimeSpan::fromSeconds(0), timeCpu, false);
-}
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -209,14 +183,18 @@ int main(int argc, char** argv) {
 			h_input[i + j* inputWidth] = inputData[(i % inputWidth) + (j % inputHeight)*inputWidth];
 		}
 	}
-	Core::writeImagePGM("input_nlm_cpu_test.pgm", h_input, inputWidth, inputHeight);
 	// Copy input data to device
-	queue.enqueueWriteBuffer(d_Img,true,0,inputWidth * inputHeight * sizeof(float),h_input.data());
+	cl::Event inputBufferWriteEvent;
+	queue.enqueueWriteBuffer(d_Img,true,0,inputWidth * inputHeight * sizeof(float),h_input.data(), NULL, &inputBufferWriteEvent);
 
 	// Do calculation on the host side
 	float h = 1;
 	int patchW = 3;
+	Core::TimeSpan timeCPU1 = Core::getCurrentTime();
 	nlmHost(h_input, h_outputCpu, h, patchW, inputWidth, inputHeight);
+	Core::TimeSpan timeCPU2 = Core::getCurrentTime();
+	Core::TimeSpan cpuTime= timeCPU2 - timeCPU1;
+
 
 	//////// Store CPU output image ///////////////////////////////////
 	Core::writeImagePGM("output_nlm_cpu.pgm", h_outputCpu, inputWidth, inputHeight);
@@ -234,6 +212,7 @@ int main(int argc, char** argv) {
     // Create a kernel object
     std::cout<<"Creating kernel object"<<std::endl;
 	cl::Kernel NLM(program, "NonLocalMeansFilter");
+	cl::Event kernelEvent;
 
 	std::cout << std::endl;
 	
@@ -242,23 +221,25 @@ int main(int argc, char** argv) {
      NLM.setArg<cl::Buffer>(1, d_ImgTemp);
      NLM.setArg<cl::Buffer>(2, d_C);
 
-	 //range check
      queue.enqueueNDRangeKernel(NLM,
 								cl::NullRange,
 								cl::NDRange(300-2, 300-2, 480-3),
 								//cl::NDRange(inputHeight-2, inputWidth-2, inputHeight-2),
-								cl::NullRange
+								cl::NullRange,
+								NULL,
+								&kernelEvent
                         		);
  	std::vector<float> h_imgTemp (count);
  	std::vector<float> h_C (count);
 
- 	queue.enqueueReadBuffer(d_ImgTemp,true,0,inputWidth * inputHeight * sizeof(float),h_imgTemp.data(),NULL,NULL);
- 	queue.enqueueReadBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_C.data(),NULL,NULL);
+ 	cl::Event readBuffer_imgTempEvent;
+ 	cl::Event readBuffer_CEvent;
+ 	queue.enqueueReadBuffer(d_ImgTemp,true,0,inputWidth * inputHeight * sizeof(float),h_imgTemp.data(),NULL,&readBuffer_imgTempEvent);
+ 	queue.enqueueReadBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_C.data(),NULL,&readBuffer_CEvent);
 
 
     for(std::size_t localI=0; localI<inputHeight - patchW + 1; localI++)
 	{
-    	std::cout<<h_imgTemp[localI + 1*inputWidth]<<std::endl;
 		  for(std::size_t localJ=0; localJ<inputWidth - patchW + 1; localJ++)
 		  {
 			  h_outputGpu[localI*inputWidth + localJ] = (h_imgTemp[localI*inputWidth + localJ])/(h_C[localI*inputWidth + localJ]);
@@ -266,18 +247,17 @@ int main(int argc, char** argv) {
 	 }
 
 	// Print performance data
-    //TODO Uncomment later
-    /*Core::TimeSpan gpuTime = OpenCL::getElapsedTime(writeBufferATime);
-	Core::TimeSpan gpuTime = OpenCL::getElapsedTime(writeBufferBTime);
-	Core::TimeSpan gpuTime = OpenCL::getElapsedTime(kernelTime);
-	Core::TimeSpan copyTime = OpenCL::getElapsedTime(readBufferTime);
-	Core::TimeSpan gpuTime = writeBufferATime + writeBufferBTime + kernelTime + readBufferTime;
-	printPerformance(matrixMulKernel, gpuTime, copyTime, atlasTime);
+    //TODO
+    Core::TimeSpan kernelTime = OpenCL::getElapsedTime(kernelEvent);
+	Core::TimeSpan readBuffer_imgTempTime = OpenCL::getElapsedTime(readBuffer_imgTempEvent);
+	Core::TimeSpan readBuffer_CTime = OpenCL::getElapsedTime(readBuffer_CEvent);
+	Core::TimeSpan inputBufferWriteTime = OpenCL::getElapsedTime(inputBufferWriteEvent);
+	Core::TimeSpan gpuTime = kernelTime + readBuffer_imgTempTime + readBuffer_CTime + inputBufferWriteTime;
+
 
 	std::cout << "GPU Time: " << gpuTime << std::endl;
 	std::cout << "CPU Time: " << cpuTime << std::endl;
-	std::cout << "Speedup: " << (double)cpuTime.getseconds()/ gpuTime.getseconds() << std::endl;
-	std::cout << "CPU Time: " << atlasTime << std::endl;*/
+	std::cout << "Speedup: " << (double)cpuTime.getSeconds()/ gpuTime.getSeconds() << std::endl;
 
 	//////// Store GPU output image ///////////////////////////////////
 	std::cout<<"Creating Output Image GPU"<<std::endl;

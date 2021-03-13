@@ -1,0 +1,24 @@
+Using platform 'NVIDIA CUDA' from 'NVIDIA Corporation'
+Working
+Using device 1 / 1
+Running on GeForce GT 610 (2.1)
+inputWidth:: 640inputHeight:: 480Starting to run nlm algorithm on cpu
+Debug:: I VALUE: 0
+Debug:: I VALUE: 1
+Debug:: I VALUE: 2
+Debug:: I VALUE: 3
+Debug:: I VALUE: 4
+Debug:: I VALUE: 5
+Debug:: I VALUE: 6
+.....
+.....
+.....
+Debug:: I VALUE: 477
+Finishing host calculation
+Image written
+Creating kernel object
+
+GPU Time: 2032.451837s
+CPU Time: 1638.424021s
+Speedup: 0.806132
+Creating Output Image GPU
