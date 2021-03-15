@@ -23,10 +23,6 @@
 
 using namespace std;
 
-// TODO: Remove constants later
-int imgWidth = 640;
-int imgHeight = 480;
-
 //////////////////////////////////////////////////////////////////////////////
 // CPU implementation of NonLocal Means Algorithm
 //////////////////////////////////////////////////////////////////////////////
@@ -59,7 +55,7 @@ void nlmHost(std::vector<float>& h_input,
 	                 for(int q=l; q<l+patchW; q++)
 	                 {
 	                    // Euclidean distance distance calculation
-	                	 v += (h_input[(i+p-k)*width+(j+q-l)] - h_input[p*width+ (q)]) * (h_input[(i+p-k)*width+(j+q-l)] - h_input[p*width+(q)]);
+	                	v += (h_input[(i+p-k)*width+(j+q-l)] - h_input[p*width+ (q)]) * (h_input[(i+p-k)*width+(j+q-l)] - h_input[p*width+(q)]);
 	                 }
 	              }
 
@@ -142,20 +138,14 @@ int main(int argc, char** argv) {
 	std::size_t count = countX * countY; // Overall number of elements
 	std::size_t size = count * sizeof (float); // Size of data in bytes
 
-
 	// Use an image (Valve.pgm) as input data
 	std::size_t inputWidth = 640, inputHeight = 480;
 	std::vector<float> inputData;
 	
 	// Allocate space for output data from CPU and GPU on the host
-	/*float h_input[480][640] = {0}, h_outputGpu[480][640] = {0};
-	float h_outputCpu[480][640] = {0};*/
 	std::vector<float> h_input (count);
 	std::vector<float> h_outputCpu (count);
 	std::vector<float> h_outputGpu (count);
-	/*h_outputCpu = new float*[480];
-	for(int i = 0; i <480; i++)
-		h_outputCpu[i] = new float[640];*/
 
 	// Allocate space for input and output data on the device
 	cl::Buffer d_Img(context, CL_MEM_READ_WRITE, inputWidth * inputHeight * sizeof(float) );
@@ -168,8 +158,7 @@ int main(int argc, char** argv) {
     memset(h_outputGpu.data(), 255, size);
     memset(h_outputCpu.data(), 255, size);
 	
-	//TODO: GPU
-    //queue.enqueueWriteBuffer(d_Img,true,0,inputWidth * inputHeight * sizeof(float), h_input.data());
+	// GPU Write Buffer
     queue.enqueueWriteBuffer(d_ImgTemp,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data());
     queue.enqueueWriteBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data());
 
@@ -183,6 +172,7 @@ int main(int argc, char** argv) {
 			h_input[i + j* inputWidth] = inputData[(i % inputWidth) + (j % inputHeight)*inputWidth];
 		}
 	}
+	
 	// Copy input data to device
 	cl::Event inputBufferWriteEvent;
 	queue.enqueueWriteBuffer(d_Img,true,0,inputWidth * inputHeight * sizeof(float),h_input.data(), NULL, &inputBufferWriteEvent);
@@ -203,7 +193,7 @@ int main(int argc, char** argv) {
 	// Reinitialize output memory to 0xff
 	memset(h_outputGpu.data(), 1.2, inputWidth * inputHeight * sizeof(float));
 
-	//GPU
+	// GPU
 	queue.enqueueWriteBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_outputGpu.data());
 
 	// Copy input data to device
@@ -217,11 +207,11 @@ int main(int argc, char** argv) {
 	std::cout << std::endl;
 	
 	// Launch kernel on the device
-     NLM.setArg<cl::Buffer>(0, d_Img);
-     NLM.setArg<cl::Buffer>(1, d_ImgTemp);
-     NLM.setArg<cl::Buffer>(2, d_C);
+    NLM.setArg<cl::Buffer>(0, d_Img);
+    NLM.setArg<cl::Buffer>(1, d_ImgTemp);
+    NLM.setArg<cl::Buffer>(2, d_C);
 
-     queue.enqueueNDRangeKernel(NLM,
+    queue.enqueueNDRangeKernel(NLM,
 								cl::NullRange,
 								cl::NDRange(300-2, 300-2, 480-3),
 								//cl::NDRange(inputHeight-2, inputWidth-2, inputHeight-2),
@@ -232,8 +222,10 @@ int main(int argc, char** argv) {
  	std::vector<float> h_imgTemp (count);
  	std::vector<float> h_C (count);
 
+	// Events Creation
  	cl::Event readBuffer_imgTempEvent;
  	cl::Event readBuffer_CEvent;
+	
  	queue.enqueueReadBuffer(d_ImgTemp,true,0,inputWidth * inputHeight * sizeof(float),h_imgTemp.data(),NULL,&readBuffer_imgTempEvent);
  	queue.enqueueReadBuffer(d_C,true,0,inputWidth * inputHeight * sizeof(float),h_C.data(),NULL,&readBuffer_CEvent);
 
@@ -246,8 +238,7 @@ int main(int argc, char** argv) {
 		  }
 	 }
 
-	// Print performance data
-    //TODO
+	// Print performance data for CPU and GPU
     Core::TimeSpan kernelTime = OpenCL::getElapsedTime(kernelEvent);
 	Core::TimeSpan readBuffer_imgTempTime = OpenCL::getElapsedTime(readBuffer_imgTempEvent);
 	Core::TimeSpan readBuffer_CTime = OpenCL::getElapsedTime(readBuffer_CEvent);
