@@ -213,8 +213,8 @@ int main(int argc, char** argv) {
 
     queue.enqueueNDRangeKernel(NLM,
 								cl::NullRange,
-								cl::NDRange(300-2, 300-2, 480-3),
-								//cl::NDRange(inputHeight-2, inputWidth-2, inputHeight-2),
+								cl::NDRange(300 - patchW + 1, 300 - patchW + 1, 480 - patchW + 1),
+								//cl::NDRange(inputHeight- patchW + 1, inputWidth - patchW + 1, inputHeight- patchW + 1),
 								cl::NullRange,
 								NULL,
 								&kernelEvent
